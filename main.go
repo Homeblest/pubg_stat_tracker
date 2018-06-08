@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"os/signal"
@@ -13,6 +14,17 @@ import (
 	"github.com/homeblest/pubg_stat_tracker/players"
 	"github.com/homeblest/pubg_stat_tracker/storage"
 )
+
+// Variables used for command line parameters
+var (
+	Token string
+)
+
+func init() {
+
+	flag.StringVar(&Token, "t", "", "Bot Token")
+	flag.Parse()
+}
 
 func main() {
 	var playerStorage players.Repository
@@ -33,7 +45,7 @@ func main() {
 	addingSvc.AddPlayer(player)
 
 	// TODO: Move the bot token to be a flag argument when booting
-	bot, err := discordgo.New("Bot NDU0NjQ2NzU2MDU2MTA0OTYy.DfweXQ.NxksM0kHOwr4sQJuoys6E_2PiRQ")
+	bot, err := discordgo.New("Bot " + Token)
 
 	if err != nil {
 		fmt.Println("Error creating Discord session: ", err)
