@@ -12,17 +12,23 @@ import (
 	"github.com/homeblest/pubg_stat_tracker/adding"
 	"github.com/homeblest/pubg_stat_tracker/matches"
 	"github.com/homeblest/pubg_stat_tracker/players"
+	"github.com/homeblest/pubg_stat_tracker/requesting"
 	"github.com/homeblest/pubg_stat_tracker/storage"
 )
 
 // Variables used for command line parameters
 var (
-	Token string
+	Token  string
+	APIKey string
 )
+
+var addingSvc adding.Service
+var requestSvc requesting.Service
 
 func init() {
 
 	flag.StringVar(&Token, "t", "", "Bot Token")
+	flag.StringVar(&APIKey, "k", "", "PUBG API Key")
 	flag.Parse()
 }
 
@@ -33,18 +39,9 @@ func main() {
 	// TODO: Migrate the repository to a DB model instead of in memory
 	playerStorage = new(storage.MemoryPlayerStorage)
 
-	addingSvc := adding.New(matchStorage, playerStorage)
+	addingSvc = adding.New(matchStorage, playerStorage)
+	requestSvc = requesting.NewService(APIKey)
 
-	player := players.Player{
-		ID:      "1234",
-		Name:    "hjalti",
-		Region:  "eu",
-		Matches: nil,
-	}
-
-	addingSvc.AddPlayer(player)
-
-	// TODO: Move the bot token to be a flag argument when booting
 	bot, err := discordgo.New("Bot " + Token)
 
 	if err != nil {
@@ -75,7 +72,18 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	}
 
-	if strings.HasPrefix(m.Content, "!hello") {
+	switch {
+	case strings.HasPrefix(m.Content, "!hello"):
 		s.ChannelMessageSend(m.ChannelID, "Hello friend!")
+	case strings.HasPrefix(m.Content, "!stats"):
+		_, err := requestSvc.RequestPlayer("pc-eu", "Homeblest")
+
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		s.ChannelMessageSend(m.ChannelID, "I tried contacting the PUBG API, did it work?")
 	}
+
 }
