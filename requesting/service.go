@@ -59,7 +59,7 @@ func (s *service) RequestPlayer(shard, name string) (*players.Player, error) {
 	player := *thePlayers[0]
 	fmt.Println(player.Name)
 
-	return thePlayers[0], nil
+	return &player, nil
 }
 
 // Request makes a request to the PUBG API
