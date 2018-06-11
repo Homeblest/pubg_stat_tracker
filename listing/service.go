@@ -11,8 +11,8 @@ type service struct {
 	playerRepo players.Repository
 }
 
-// New creates a player listing service
-func New(playerRepo players.Repository) Service {
+// NewService creates a player listing service
+func NewService(playerRepo players.Repository) Service {
 	return &service{playerRepo}
 }
 

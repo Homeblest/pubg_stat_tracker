@@ -10,6 +10,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/homeblest/pubg_stat_tracker/adding"
+	"github.com/homeblest/pubg_stat_tracker/listing"
 	"github.com/homeblest/pubg_stat_tracker/matches"
 	"github.com/homeblest/pubg_stat_tracker/players"
 	"github.com/homeblest/pubg_stat_tracker/requesting"
@@ -24,23 +25,22 @@ var (
 
 var addingSvc adding.Service
 var requestSvc requesting.Service
+var listingSvc listing.Service
 
-func init() {
-
+func main() {
 	flag.StringVar(&Token, "t", "", "Bot Token")
 	flag.StringVar(&APIKey, "k", "", "PUBG API Key")
 	flag.Parse()
-}
 
-func main() {
 	var playerStorage players.Repository
 	var matchStorage matches.Repository
 
 	// TODO: Migrate the repository to a DB model instead of in memory
 	playerStorage = new(storage.MemoryPlayerStorage)
 
-	addingSvc = adding.New(matchStorage, playerStorage)
+	addingSvc = adding.NewService(matchStorage, playerStorage)
 	requestSvc = requesting.NewService(APIKey)
+	listingSvc = listing.NewService(playerStorage)
 
 	bot, err := discordgo.New("Bot " + Token)
 
@@ -76,14 +76,26 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	case strings.HasPrefix(m.Content, "!hello"):
 		s.ChannelMessageSend(m.ChannelID, "Hello friend!")
 	case strings.HasPrefix(m.Content, "!stats"):
-		_, err := requestSvc.RequestPlayer("pc-eu", "Homeblest")
+		player, err := listingSvc.GetPlayer("Homeblest")
 
 		if err != nil {
-			fmt.Println(err)
-			return
+			if err == players.ErrorPlayerNotFound {
+				// Player wasn't found in storage, get him from the API and store him
+				player, err := requestSvc.RequestPlayer("pc-eu", "Homeblest")
+				if err != nil {
+					fmt.Println(err)
+					return
+				}
+				addingSvc.AddPlayer(*player)
+			} else {
+				fmt.Println(err)
+				return
+			}
+
 		}
 
-		s.ChannelMessageSend(m.ChannelID, "I tried contacting the PUBG API, did it work?")
+		playerString := fmt.Sprintf("I tried contacting the PUBG API, did it work? playerName: %s", player.Name)
+		s.ChannelMessageSend(m.ChannelID, playerString)
 	}
 
 }

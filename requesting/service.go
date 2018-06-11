@@ -1,14 +1,16 @@
 package requesting
 
 import (
-	"bytes"
 	"compress/gzip"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"reflect"
 
 	"github.com/homeblest/pubg_stat_tracker/players"
+	"github.com/slemgrim/jsonapi"
 )
 
 // Service takes care of requesting data from the PUBG API
@@ -28,29 +30,40 @@ func NewService(APIKey string) Service {
 }
 
 func (s *service) RequestPlayer(shard, name string) (*players.Player, error) {
-	var player players.Player
-
 	parameters := url.Values{
 		"filter[playerNames]": {name},
 	}
 
 	endpointURL := fmt.Sprintf("https://api.playbattlegrounds.com/shards/%s/players?%s", shard, parameters.Encode())
 
-	fmt.Println(endpointURL)
+	reader, err := httpRequest(endpointURL, s.APIKey)
 
-	buffer, err := httpRequest(endpointURL, s.APIKey)
+	if err != nil {
+		return nil, err
+	}
+	result, err := jsonapi.UnmarshalManyPayload(*reader, reflect.TypeOf(new(players.Player)))
 
 	if err != nil {
 		return nil, err
 	}
 
-	fmt.Printf("data:\n%s\n", buffer)
+	thePlayers := make([]*players.Player, len(result))
 
-	return &player, nil
+	for idx, elt := range result {
+		player, ok := elt.(*players.Player)
+		if !ok {
+			return nil, errors.New("Failed to convert players")
+		}
+		thePlayers[idx] = player
+	}
+	player := *thePlayers[0]
+	fmt.Println(player.Name)
+
+	return thePlayers[0], nil
 }
 
 // Request makes a request to the PUBG API
-func httpRequest(url, key string) (*bytes.Buffer, error) {
+func httpRequest(url, key string) (*io.Reader, error) {
 	// Create the request
 	req, err := http.NewRequest("GET", url, nil)
 
@@ -61,7 +74,6 @@ func httpRequest(url, key string) (*bytes.Buffer, error) {
 	// Configure the  request
 	req.Header.Set("Authorization", key)
 	req.Header.Set("Accept", "application/vnd.api+json")
-	req.Header.Set("Accept-Encoding", "gzip")
 
 	// Send the request
 	client := &http.Client{}
@@ -76,8 +88,8 @@ func httpRequest(url, key string) (*bytes.Buffer, error) {
 		return nil, fmt.Errorf("HTTP request failed: %s", response.Status)
 	}
 
-	var reader io.ReadCloser
-
+	// Retrieve response body
+	var reader io.Reader
 	switch response.Header.Get("Content-Encoding") {
 	case "gzip":
 		reader, err = gzip.NewReader(response.Body)
@@ -88,8 +100,5 @@ func httpRequest(url, key string) (*bytes.Buffer, error) {
 		reader = response.Body
 	}
 
-	var buffer bytes.Buffer
-	buffer.ReadFrom(reader)
-
-	return &buffer, nil
+	return &reader, nil
 }

@@ -16,8 +16,8 @@ type service struct {
 	playerRepo players.Repository
 }
 
-// New creates an adding service which handles the matches
-func New(matchRepo matches.Repository, playerRepo players.Repository) Service {
+// NewService creates an adding service which handles the matches
+func NewService(matchRepo matches.Repository, playerRepo players.Repository) Service {
 	return &service{matchRepo, playerRepo}
 }
 

@@ -1,10 +1,19 @@
 package matches
 
-import "errors"
+import (
+	"errors"
+	"time"
+)
 
 // Match defines the properties of a PUBG match
 type Match struct {
-	ID string
+	ID           string    `jsonapi:"primary,match"`
+	CreatedAt    time.Time `jsonapi:"attr,createdAt,iso8601"`
+	Duration     int       `jsonapi:"attr,duration"`
+	GameMode     string    `jsonapi:"attr,gameMode"`
+	PatchVersion string    `jsonapi:"attr,patchVersion"`
+	ShardID      string    `jsonapi:"attr,shardId"`
+	TitleID      string    `jsonapi:"attr,titleId"`
 }
 
 // ErrorMatchNotFound is used when trying to access a match that doesn't exist in the matches.Repository
