@@ -17,13 +17,13 @@ func (m *MemoryPlayerStorage) Add(player players.Player) error {
 }
 
 // Get retrieves the player from memory, if it exists
-func (m *MemoryPlayerStorage) Get(name string) (players.Player, error) {
+func (m *MemoryPlayerStorage) Get(name string) (*players.Player, error) {
 	var emptyPlayer players.Player
 
 	for i := range m.players {
-		if m.players[i].Name == name {
-			return m.players[i], nil
+		if m.players[i].Attributes.Name == name {
+			return &m.players[i], nil
 		}
 	}
-	return emptyPlayer, players.ErrorPlayerNotFound
+	return &emptyPlayer, players.ErrorPlayerNotFound
 }

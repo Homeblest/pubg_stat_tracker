@@ -5,19 +5,44 @@ import (
 	"errors"
 	"time"
 
+	"github.com/homeblest/pubg_stat_tracker/links"
 	"github.com/homeblest/pubg_stat_tracker/matches"
 )
 
+// Data defines the data properties of a player request from the PUBG API
+type Data struct {
+	Players []Player    `json:"data"`
+	Links   links.Link  `json:"links"`
+	Meta    interface{} `json:"meta"` // Not used by the PUBG API right now, but we must declare it to unmarshal the JSON
+}
+
+// attributes defines the attributes of a PUBG player.
+type attributes struct {
+	CreatedAt    time.Time   `json:"createdAt"`
+	Name         string      `json:"name"`
+	PatchVersion string      `json:"patchVersion"`
+	ShardID      string      `json:"shardId"`
+	Stats        interface{} `json:"stats"` // Not used by the PUBG API right now, stats are actually in the seasons.
+	TitleID      string      `json:"titleId"`
+	UpdatedAt    time.Time   `json:"updatedAt"`
+}
+
+type assets struct {
+	Data []interface{} `json:"data"`
+}
+
+type relationships struct {
+	Assets  assets       `json:"assets"`
+	Matches matches.Lite `json:"matches"`
+}
+
 // Player defines the properties of a PUBG character
 type Player struct {
-	ID           string           `jsonapi:"primary,player"`
-	Name         string           `jsonapi:"attr,name"`
-	ShardID      string           `jsonapi:"attr,shardId"`
-	CreatedAt    time.Time        `jsonapi:"attr,createdAt,iso8601"`
-	UpdatedAt    time.Time        `jsonapi:"attr,updatedAt,iso8601"`
-	PatchVersion string           `jsonapi:"attr,patchVersion"`
-	TitleID      string           `jsonapi:"attr,titleId"`
-	Matches      []*matches.Match `jsonapi:"relation,matches"`
+	Type          string        `json:"type"`
+	ID            string        `json:"id"`
+	Attributes    attributes    `json:"attributes"`
+	Relationships relationships `json:"relationships"`
+	Links         links.Link    `json:"links"`
 }
 
 // ErrorPlayerNotFound is used when trying to access a player that doesn't exist in the players.Repository
@@ -25,7 +50,7 @@ var ErrorPlayerNotFound = errors.New("Player not found")
 
 // Repository provides access to the list of players
 type Repository interface {
-	Get(id string) (Player, error)
+	Get(id string) (*Player, error)
 	Add(Player) error
 }
 

@@ -1,16 +1,15 @@
 package requesting
 
 import (
-	"compress/gzip"
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
-	"reflect"
 
 	"github.com/homeblest/pubg_stat_tracker/players"
-	"github.com/slemgrim/jsonapi"
 )
 
 // Service takes care of requesting data from the PUBG API
@@ -29,41 +28,43 @@ func NewService(APIKey string) Service {
 	}
 }
 
-func (s *service) RequestPlayer(shard, name string) (*players.Player, error) {
-	parameters := url.Values{
-		"filter[playerNames]": {name},
-	}
-
-	endpointURL := fmt.Sprintf("https://api.playbattlegrounds.com/shards/%s/players?%s", shard, parameters.Encode())
-
-	reader, err := httpRequest(endpointURL, s.APIKey)
-
+func (s *service) RequestPlayer(name, shard string) (*players.Player, error) {
+	players, err := s.RequestPlayers(name, shard)
 	if err != nil {
 		return nil, err
 	}
-	result, err := jsonapi.UnmarshalManyPayload(*reader, reflect.TypeOf(new(players.Player)))
+	player := players[0]
 
-	if err != nil {
-		return nil, err
-	}
-
-	thePlayers := make([]*players.Player, len(result))
-
-	for idx, elt := range result {
-		player, ok := elt.(*players.Player)
-		if !ok {
-			return nil, errors.New("Failed to convert players")
-		}
-		thePlayers[idx] = player
-	}
-	player := *thePlayers[0]
-	fmt.Println(player.Name)
+	fmt.Println("RequestPlayer:")
+	fmt.Println(player.Attributes.Name)
 
 	return &player, nil
 }
 
-// Request makes a request to the PUBG API
-func httpRequest(url, key string) (*io.Reader, error) {
+func (s *service) RequestPlayers(name, shard string) ([]players.Player, error) {
+	apiURL := fmt.Sprintf(pubgAPIBaseShardURL, string(shard), playersEndpoint)
+
+	query := url.Values{"filter[playerNames]": {name}}
+
+	body, err := createRequest(apiURL, s.APIKey, query)
+	if err != nil {
+		return nil, err
+	}
+
+	playersData := &players.Data{}
+
+	err = json.NewDecoder(body).Decode(playersData)
+	if err != nil {
+		return nil, err
+	}
+
+	players := *playersData
+
+	return players.Players, nil
+}
+
+// createRequest makes a http GET request to the PUBG API
+func createRequest(url, key string, query url.Values) (*bytes.Buffer, error) {
 	// Create the request
 	req, err := http.NewRequest("GET", url, nil)
 
@@ -75,30 +76,36 @@ func httpRequest(url, key string) (*io.Reader, error) {
 	req.Header.Set("Authorization", key)
 	req.Header.Set("Accept", "application/vnd.api+json")
 
+	if query != nil {
+		req.URL.RawQuery = query.Encode()
+	}
+
 	// Send the request
-	client := &http.Client{}
-	response, err := client.Do(req)
+	res, err := http.DefaultClient.Do(req)
 
 	if err != nil {
 		return nil, err
 	}
 
-	if response.StatusCode != 200 {
-		response.Body.Close()
-		return nil, fmt.Errorf("HTTP request failed: %s", response.Status)
-	}
-
-	// Retrieve response body
-	var reader io.Reader
-	switch response.Header.Get("Content-Encoding") {
-	case "gzip":
-		reader, err = gzip.NewReader(response.Body)
-		if err != nil {
-			return nil, err
+	if res.StatusCode != http.StatusOK {
+		switch res.StatusCode {
+		case http.StatusUnauthorized:
+			return nil, errors.New("API key invalid or missing")
+		case http.StatusNotFound:
+			return nil, errors.New("The specified resource was not found")
+		case http.StatusUnsupportedMediaType:
+			return nil, errors.New("Content type incorrect or not specified")
+		case http.StatusTooManyRequests:
+			return nil, errors.New("Too many requests")
+		default:
+			return nil, errors.New(res.Status)
 		}
-	default:
-		reader = response.Body
 	}
 
-	return &reader, nil
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	return bytes.NewBuffer(body), nil
 }

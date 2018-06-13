@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
 	"os/signal"
@@ -28,9 +27,8 @@ var requestSvc requesting.Service
 var listingSvc listing.Service
 
 func main() {
-	flag.StringVar(&Token, "t", "", "Bot Token")
-	flag.StringVar(&APIKey, "k", "", "PUBG API Key")
-	flag.Parse()
+	APIKey = os.Getenv("PUBG_API_KEY")
+	Token = os.Getenv("DISCORD_BOT_TOKEN")
 
 	var playerStorage players.Repository
 	var matchStorage matches.Repository
@@ -71,30 +69,21 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if m.Author.ID == s.State.User.ID {
 		return
 	}
+	inputString := strings.Split(m.Content, " ")
+	cmd := inputString[0]
 
-	switch {
-	case strings.HasPrefix(m.Content, "!hello"):
+	switch cmd {
+	case "!hello":
 		s.ChannelMessageSend(m.ChannelID, "Hello friend!")
-	case strings.HasPrefix(m.Content, "!stats"):
-		player, err := listingSvc.GetPlayer("Homeblest")
+	case "!stats":
+		name := inputString[1]
 
+		playerPointer, err := requestSvc.RequestPlayer(name, "pc-eu")
 		if err != nil {
-			if err == players.ErrorPlayerNotFound {
-				// Player wasn't found in storage, get him from the API and store him
-				player, err := requestSvc.RequestPlayer("pc-eu", "Homeblest")
-				if err != nil {
-					fmt.Println(err)
-					return
-				}
-				addingSvc.AddPlayer(*player)
-			} else {
-				fmt.Println(err)
-				return
-			}
-
+			fmt.Println(err)
+			return
 		}
-
-		playerString := fmt.Sprintf("I tried contacting the PUBG API, did it work? playerName: %s", player.Name)
+		playerString := fmt.Sprintf("I tried contacting the PUBG API, did it work? playerName: %s", playerPointer.Attributes.Name)
 		s.ChannelMessageSend(m.ChannelID, playerString)
 	}
 
