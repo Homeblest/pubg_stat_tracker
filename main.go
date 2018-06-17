@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/signal"
@@ -97,9 +98,12 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			fmt.Println(err)
 			return
 		}
+		var buffer bytes.Buffer
 		for _, season := range seasonData.Seasons {
-			s.ChannelMessageSend(m.ChannelID, season.ID)
+			buffer.WriteString(fmt.Sprintf("%s\n", season.ID))
 		}
+		s.ChannelMessageSend(m.ChannelID, buffer.String())
+
 	}
 
 }
