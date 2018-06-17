@@ -35,9 +35,6 @@ func (s *service) RequestPlayer(name, shard string) (*players.Player, error) {
 	}
 	player := players[0]
 
-	fmt.Println("RequestPlayer:")
-	fmt.Println(player.Attributes.Name)
-
 	return &player, nil
 }
 

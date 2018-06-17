@@ -12,14 +12,14 @@ import (
 	"github.com/homeblest/pubg_stat_tracker/listing"
 	"github.com/homeblest/pubg_stat_tracker/matches"
 	"github.com/homeblest/pubg_stat_tracker/players"
+	"github.com/homeblest/pubg_stat_tracker/regions"
 	"github.com/homeblest/pubg_stat_tracker/requesting"
 	"github.com/homeblest/pubg_stat_tracker/storage"
 )
 
-// Variables used for command line parameters
 var (
-	Token  string
-	APIKey string
+	token  string
+	apiKey string
 )
 
 var addingSvc adding.Service
@@ -27,8 +27,8 @@ var requestSvc requesting.Service
 var listingSvc listing.Service
 
 func main() {
-	APIKey = os.Getenv("PUBG_API_KEY")
-	Token = os.Getenv("DISCORD_BOT_TOKEN")
+	apiKey = os.Getenv("PUBG_API_KEY")
+	token = os.Getenv("DISCORD_BOT_TOKEN")
 
 	var playerStorage players.Repository
 	var matchStorage matches.Repository
@@ -37,10 +37,10 @@ func main() {
 	playerStorage = new(storage.MemoryPlayerStorage)
 
 	addingSvc = adding.NewService(matchStorage, playerStorage)
-	requestSvc = requesting.NewService(APIKey)
+	requestSvc = requesting.NewService(apiKey)
 	listingSvc = listing.NewService(playerStorage)
 
-	bot, err := discordgo.New("Bot " + Token)
+	bot, err := discordgo.New("Bot " + token)
 
 	if err != nil {
 		fmt.Println("Error creating Discord session: ", err)
@@ -76,14 +76,20 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	case "!hello":
 		s.ChannelMessageSend(m.ChannelID, "Hello friend!")
 	case "!stats":
-		name := inputString[1]
+		if len(inputString) < 3 {
+			s.ChannelMessageSend(m.ChannelID, "Invalid command, use: !stats <playerName> <region> <gameMode>")
+			return
+		}
+		playerName := inputString[1]
+		shardID := regions.GetShardIDFromRegion(inputString[2])
+		// gameMode := inputString[3]
 
-		playerPointer, err := requestSvc.RequestPlayer(name, "pc-eu")
+		player, err := requestSvc.RequestPlayer(playerName, shardID)
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
-		playerString := fmt.Sprintf("I tried contacting the PUBG API, did it work? playerName: %s", playerPointer.Attributes.Name)
+		playerString := fmt.Sprintf("I tried contacting the PUBG API, did it work? playerName: %s", player.Attributes.Name)
 		s.ChannelMessageSend(m.ChannelID, playerString)
 	}
 
