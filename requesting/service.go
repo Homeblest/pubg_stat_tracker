@@ -10,11 +10,13 @@ import (
 	"net/url"
 
 	"github.com/homeblest/pubg_stat_tracker/players"
+	"github.com/homeblest/pubg_stat_tracker/seasons"
 )
 
 // Service takes care of requesting data from the PUBG API
 type Service interface {
 	RequestPlayer(string, string) (*players.Player, error)
+	RequestSeasons(string) (*seasons.SeasonData, error)
 }
 
 type service struct {
@@ -58,6 +60,24 @@ func (s *service) RequestPlayers(name, shard string) ([]players.Player, error) {
 	players := *playersData
 
 	return players.Players, nil
+}
+
+func (s *service) RequestSeasons(shard string) (*seasons.SeasonData, error) {
+	apiURL := fmt.Sprintf(pubgAPIBaseShardURL, string(shard), seasonsEndpoint)
+
+	body, err := createRequest(apiURL, s.APIKey, url.Values{})
+	if err != nil {
+		return nil, err
+	}
+
+	seasonData := &seasons.SeasonData{}
+
+	err = json.NewDecoder(body).Decode(seasonData)
+	if err != nil {
+		return nil, err
+	}
+
+	return seasonData, nil
 }
 
 // createRequest makes a http GET request to the PUBG API

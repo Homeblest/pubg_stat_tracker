@@ -91,6 +91,15 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 		playerString := fmt.Sprintf("I tried contacting the PUBG API, did it work? playerName: %s", player.Attributes.Name)
 		s.ChannelMessageSend(m.ChannelID, playerString)
+	case "!seasons":
+		seasonData, err := requestSvc.RequestSeasons("pc-eu")
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		for _, season := range seasonData.Seasons {
+			s.ChannelMessageSend(m.ChannelID, season.ID)
+		}
 	}
 
 }
