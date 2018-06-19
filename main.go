@@ -66,16 +66,25 @@ func main() {
 }
 
 func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
-	// Ignore all messages created by the bot itself
-	if m.Author.ID == s.State.User.ID {
+	// Ignore all messages created by the bot itself, and if the message doesn't start with ! (bang)
+	if m.Author.ID == s.State.User.ID || !strings.HasPrefix(m.Content, "!") {
 		return
 	}
+
 	inputString := strings.Split(m.Content, " ")
 	cmd := inputString[0]
 
 	switch cmd {
-	case "!hello":
-		s.ChannelMessageSend(m.ChannelID, "Hello friend!")
+	case "!status":
+		status, err := requestSvc.RequestStatus()
+		if err != nil {
+			s.ChannelMessageSend(m.ChannelID, "Apologies, the PUBG API seems to be down at the moment")
+			return
+		}
+		statusString := fmt.Sprintf("Type: %s - ID: %s - Release Date: %s - Version: %s",
+			status.Data.Type, status.Data.ID, status.Data.Attributes.ReleasedAt, status.Data.Attributes.Version,
+		)
+		s.ChannelMessageSend(m.ChannelID, statusString)
 	case "!stats":
 		if len(inputString) < 3 {
 			s.ChannelMessageSend(m.ChannelID, "Invalid command, use: !stats <playerName> <region> <gameMode>")
@@ -87,11 +96,28 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 		player, err := requestSvc.RequestPlayer(playerName, shardID)
 		if err != nil {
-			fmt.Println(err)
+			s.ChannelMessageSend(m.ChannelID, err.Error())
 			return
 		}
-		playerString := fmt.Sprintf("I tried contacting the PUBG API, did it work? playerName: %s", player.Attributes.Name)
-		s.ChannelMessageSend(m.ChannelID, playerString)
+
+		allSeasons, err := requestSvc.RequestSeasons(shardID)
+		if err != nil {
+			fmt.Println(err.Error())
+			s.ChannelMessageSend(m.ChannelID, "Failed requesting seasons")
+			return
+		}
+		var currentSeasonID string
+
+		for _, season := range allSeasons.Seasons {
+			if season.Attributes.IsCurrentSeason {
+				currentSeasonID = season.ID
+			}
+		}
+
+		playerSeasonStats, err := requestSvc.RequestSeasonStatistics(player.ID, currentSeasonID, shardID)
+		statisticsString := fmt.Sprintf("You have killed %d players", playerSeasonStats.Data.Attributes.GameModeStats.SquadFPP.Kills)
+
+		s.ChannelMessageSend(m.ChannelID, statisticsString)
 	case "!seasons":
 		seasonData, err := requestSvc.RequestSeasons("pc-eu")
 		if err != nil {

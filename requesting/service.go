@@ -8,15 +8,20 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/homeblest/pubg_stat_tracker/players"
 	"github.com/homeblest/pubg_stat_tracker/seasons"
+	"github.com/homeblest/pubg_stat_tracker/statistics"
+	"github.com/homeblest/pubg_stat_tracker/status"
 )
 
 // Service takes care of requesting data from the PUBG API
 type Service interface {
 	RequestPlayer(string, string) (*players.Player, error)
 	RequestSeasons(string) (*seasons.SeasonData, error)
+	RequestSeasonStatistics(string, string, string) (*statistics.SeasonStatistics, error)
+	RequestStatus() (*status.API, error)
 }
 
 type service struct {
@@ -30,6 +35,24 @@ func NewService(APIKey string) Service {
 	}
 }
 
+func (s *service) RequestStatus() (*status.API, error) {
+	apiURL := pubgAPIBaseURL + statusEndpoint
+
+	body, err := createRequest(apiURL, s.APIKey, url.Values{})
+	if err != nil {
+		return nil, err
+	}
+
+	status := &status.API{}
+
+	err = json.NewDecoder(body).Decode(&status)
+	if err != nil {
+		return nil, err
+	}
+
+	return status, nil
+}
+
 func (s *service) RequestPlayer(name, shard string) (*players.Player, error) {
 	players, err := s.RequestPlayers(name, shard)
 	if err != nil {
@@ -41,11 +64,12 @@ func (s *service) RequestPlayer(name, shard string) (*players.Player, error) {
 }
 
 func (s *service) RequestPlayers(name, shard string) ([]players.Player, error) {
-	apiURL := fmt.Sprintf(pubgAPIBaseShardURL, string(shard), playersEndpoint)
+	shardURL := fmt.Sprintf(pubgAPIBaseShardURL, string(shard))
+	playersURL := strings.Join([]string{shardURL, playersEndpoint}, "")
 
 	query := url.Values{"filter[playerNames]": {name}}
 
-	body, err := createRequest(apiURL, s.APIKey, query)
+	body, err := createRequest(playersURL, s.APIKey, query)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +87,8 @@ func (s *service) RequestPlayers(name, shard string) ([]players.Player, error) {
 }
 
 func (s *service) RequestSeasons(shard string) (*seasons.SeasonData, error) {
-	apiURL := fmt.Sprintf(pubgAPIBaseShardURL, string(shard), seasonsEndpoint)
+	shardURL := fmt.Sprintf(pubgAPIBaseShardURL, string(shard))
+	apiURL := strings.Join([]string{shardURL, seasonsEndpoint}, "")
 
 	body, err := createRequest(apiURL, s.APIKey, url.Values{})
 	if err != nil {
@@ -78,6 +103,24 @@ func (s *service) RequestSeasons(shard string) (*seasons.SeasonData, error) {
 	}
 
 	return seasonData, nil
+}
+
+func (s *service) RequestSeasonStatistics(playerID, seasonID, shard string) (*statistics.SeasonStatistics, error) {
+	apiURL := fmt.Sprintf(statisticsEndpoint, string(shard), playerID, seasonID)
+
+	body, err := createRequest(apiURL, s.APIKey, url.Values{})
+	if err != nil {
+		return nil, err
+	}
+
+	seasonStatistics := &statistics.SeasonStatistics{}
+
+	err = json.NewDecoder(body).Decode(seasonStatistics)
+	if err != nil {
+		return nil, err
+	}
+
+	return seasonStatistics, nil
 }
 
 // createRequest makes a http GET request to the PUBG API
