@@ -7,6 +7,7 @@ import (
 
 	"github.com/homeblest/pubg_stat_tracker/links"
 	"github.com/homeblest/pubg_stat_tracker/matches"
+	"github.com/homeblest/pubg_stat_tracker/statistics"
 )
 
 // Data defines the data properties of a player request from the PUBG API
@@ -43,6 +44,7 @@ type Player struct {
 	Attributes    attributes    `json:"attributes"`
 	Relationships relationships `json:"relationships"`
 	Links         links.Link    `json:"links"`
+	GameModeStats statistics.GameModeStatistics
 }
 
 // ErrorPlayerNotFound is used when trying to access a player that doesn't exist in the players.Repository

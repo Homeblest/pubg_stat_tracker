@@ -27,15 +27,15 @@ var addingSvc adding.Service
 var requestSvc requesting.Service
 var listingSvc listing.Service
 
+var playerStorage players.Repository
+
 func main() {
 	apiKey = os.Getenv("PUBG_API_KEY")
 	token = os.Getenv("DISCORD_BOT_TOKEN")
 
-	var playerStorage players.Repository
 	var matchStorage matches.Repository
 
-	// TODO: Migrate the repository to a DB model instead of in memory
-	playerStorage = new(storage.MemoryPlayerStorage)
+	playerStorage = new(storage.RedisPlayerStorage)
 
 	addingSvc = adding.NewService(matchStorage, playerStorage)
 	requestSvc = requesting.NewService(apiKey)
@@ -115,9 +115,17 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 
 		playerSeasonStats, err := requestSvc.RequestSeasonStatistics(player.ID, currentSeasonID, shardID)
-		statisticsString := fmt.Sprintf("You have killed %d players", playerSeasonStats.Data.Attributes.GameModeStats.SquadFPP.Kills)
+		if err != nil {
+			fmt.Println(err.Error())
+			s.ChannelMessageSend(m.ChannelID, "Failed requesting season statistics")
+			return
+		}
 
-		s.ChannelMessageSend(m.ChannelID, statisticsString)
+		player.GameModeStats = playerSeasonStats.Data.Attributes.GameModeStats
+
+		addingSvc.AddPlayer(*player)
+
+		s.ChannelMessageSend(m.ChannelID, "Added player to Redis")
 	case "!seasons":
 		seasonData, err := requestSvc.RequestSeasons("pc-eu")
 		if err != nil {
